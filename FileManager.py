@@ -231,30 +231,34 @@ def show_main_interface():
 def show_file_manager():
     st.subheader("File Manager")
     
-    # Upload file
-    with st.expander("Upload File", expanded=False):
-        uploaded_file = st.file_uploader("Pilih file untuk diunggah", 
-                                        help="File akan diunggah ke path saat ini")
+    # Upload multiple files
+    with st.expander("Upload Files", expanded=False):
+        uploaded_files = st.file_uploader("Pilih file untuk diunggah", 
+                                          accept_multiple_files=True,
+                                          help="File akan diunggah ke path saat ini")
         
-        if uploaded_file is not None:
-            if st.button("Upload File", use_container_width=True):
+        if uploaded_files:
+            if st.button("Upload Files", use_container_width=True):
                 with st.spinner("Mengunggah file..."):
                     try:
                         sftp = st.session_state.ssh_client.open_sftp()
-                        temp_path = os.path.join(tempfile.gettempdir(), uploaded_file.name)
                         
-                        # Simpan ke file sementara
-                        with open(temp_path, "wb") as f:
-                            f.write(uploaded_file.getbuffer())
+                        for uploaded_file in uploaded_files:
+                            temp_path = os.path.join(tempfile.gettempdir(), uploaded_file.name)
+                            
+                            # Simpan ke file sementara
+                            with open(temp_path, "wb") as f:
+                                f.write(uploaded_file.getbuffer())
+                            
+                            # Upload ke server
+                            remote_path = os.path.join(st.session_state.current_path, uploaded_file.name).replace('\\', '/')
+                            sftp.put(temp_path, remote_path)
+                            
+                            # Hapus file sementara
+                            os.remove(temp_path)
                         
-                        # Upload ke server
-                        remote_path = os.path.join(st.session_state.current_path, uploaded_file.name).replace('\\', '/')
-                        sftp.put(temp_path, remote_path)
-                        
-                        # Bersihkan
                         sftp.close()
-                        os.remove(temp_path)
-                        st.success(f"File {uploaded_file.name} berhasil diunggah!")
+                        st.success(f"{len(uploaded_files)} file berhasil diunggah!")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Gagal mengunggah file: {e}")
